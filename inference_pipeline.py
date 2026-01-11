@@ -77,22 +77,12 @@ def main():
     teacher_decoder.load_state_dict(teacher_state["decoder"])
     teacher_decoder.eval()
     
-    student_ckpt_path = "distilled_stage_4.pt"
-    student_decoder = EdgeDiffusionDecoder(cfg).to(device)
-    student_decoder.load_state_dict(torch.load(student_ckpt_path, map_location=device))
-    student_decoder.eval()
-    
     schedule = DiffusionSchedule(cfg.diff_steps, cfg.beta_start, cfg.beta_end, device)
     
     # DPM-Solver++ for fast sampling
     dpm_solver = DPMSolverPP(schedule, order=2, predict_x0=False)  # v-prediction model
     
-    # --- Frequency Coherence Network ---
-    from frequency_coherence_net import FrequencyCoherenceNet
-    fcn = FrequencyCoherenceNet(n_mels=cfg.n_mels, hidden=32, n_blocks=4).to(device)
-    fcn.load_state_dict(torch.load("fcn_best.pt", map_location=device))
-    fcn.eval()
-    print("Loaded Frequency Coherence Network")
+    print("Loaded teacher model")
     
     # --- Transforms ---
     inv_mel = T.InverseMelScale(n_stft=cfg.n_fft//2+1, n_mels=cfg.n_mels, sample_rate=cfg.sample_rate).to("cpu")
@@ -359,10 +349,6 @@ def main():
             # We want the LAST overlap_frames of THIS generated chunk
             # to be the START (known_mel) of the NEXT chunk.
             prev_mel_tail = x_refined[:, -overlap_frames:, :].clone()
-            
-            # Apply Frequency Coherence Network to fix vertical artifacts
-            with torch.no_grad():
-                x_refined = fcn(x_refined)
             
             # Denorm using per-chunk GT stats (achieves 0.9+)
             mel_chunk_log = torch.log(torch.clamp(mel_transform(wav[:, start_sample:end_sample]), min=1e-5)).transpose(1, 2)
