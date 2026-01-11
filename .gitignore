@@ -48,8 +48,8 @@ checkpoints/
 logs/
 tensorboard/
 
-# Data (too large for git)
-data/
+# Data (too large for git - only root data folder)
+/data/
 
 # Misc
 .DS_Store
